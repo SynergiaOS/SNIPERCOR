@@ -1,0 +1,44 @@
+# Prometheus configuration for SolanaSniperV3
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # SniperCore metrics
+  - job_name: 'sniper-core'
+    static_configs:
+      - targets: ['sniper-core:8003']
+    metrics_path: '/metrics'
+    scrape_interval: 5s  # High frequency for HFT system
+
+  # DragonflyDB metrics
+  - job_name: 'dragonfly'
+    static_configs:
+      - targets: ['dragonfly:6379']
+    metrics_path: '/metrics'
+
+  # PostgreSQL metrics (if exporter is added)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: '/metrics'
+
+  # Kestra metrics
+  - job_name: 'kestra'
+    static_configs:
+      - targets: ['kestra:8080']
+    metrics_path: '/metrics'
+
+  # Node exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['host.docker.internal:9100']

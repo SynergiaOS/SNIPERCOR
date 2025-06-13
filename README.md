@@ -1,97 +1,90 @@
-# 🎯 SolanaSniperV3 - High-Performance Trading System
+# 🎯 SolanaSniperV3 - Production HFT Trading System
 
-[![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
-[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org)
+[![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Contabo](https://img.shields.io/badge/optimized-Contabo_VDS-red.svg)](https://contabo.com)
 
-Zaawansowany system automatycznego tradingu na sieci Solana z architekturą hybrydową Rust + Python, zoptymalizowany pod serwer Contabo VDS (6 CPU / 24GB RAM).
+Production-ready High-Frequency Trading system built in Pure Rust, optimized for ultra-low latency trading on Solana blockchain.
 
-## 🏗️ **Architektura**
+## ⚡ Key Features
 
-### **Filozofia: Hybrid Rust + Python**
-- **🦀 sniper-core (Rust):** Ultra-szybkie wykonywanie transakcji
-- **🐍 strategy-host (Python):** Elastyczna logika biznesowa i AI
-- **🔗 Komunikacja:** Proste, wydajne REST API
+- **Ultra-low latency** - Microsecond-optimized execution
+- **Pure Rust** - Maximum performance & memory safety
+- **Production-ready** - Optimized for Contabo VDS (6 vCPU / 24GB RAM)
+- **Real-time monitoring** - Comprehensive metrics & health checks
+- **Secure by default** - Paper trading mode, externalized secrets
 
-### **Stos Technologiczny**
-- **Backend:** Rust (Axum, Tokio), Python (FastAPI)
-- **Blockchain:** Solana SDK, Helius SDK (smart transactions)
-- **Cache:** DragonflyDB (25x szybszy niż Redis)
-- **Database:** PostgreSQL
-- **Orkiestracja:** Kestra z Docker
-- **Deployment:** Docker Compose
+## 🏗️ Architecture
 
-## 🖥️ **Optymalizacja Contabo VDS**
+- **sniper-core** (Rust) - Ultra-fast execution engine
+- **DragonflyDB** - High-performance cache
+- **PostgreSQL** - Transaction history
+- **Kestra** - Workflow orchestration
+- **Prometheus** - Monitoring & metrics
 
-### **Specyfikacja Serwera**
-- **CPU:** 6 rdzeni (vCPU)
-- **RAM:** 24 GB
-- **Strategia:** Inteligentna alokacja zasobów
+## 🚀 Production Deployment
 
-### **Alokacja Zasobów**
-```yaml
-sniper-core (Rust):    4 CPU + 6GB RAM   # Krytyczne operacje
-DragonflyDB:           6 CPU + 10GB RAM  # Ultra-szybki cache
-Pozostałe serwisy:     2 CPU + 8GB RAM   # Python, PostgreSQL, Kestra
-```
+### Prerequisites
 
-## 🚀 **Szybki Start**
+- Docker 24.0+ & Docker Compose 2.0+
+- 24GB RAM minimum, 6 CPU cores
+- Ubuntu 20.04+ / Debian 11+
 
-### **1. Klonowanie Repozytorium**
+### Quick Deploy
+
 ```bash
 git clone https://github.com/SynergiaOS/SNIPERCOR.git
 cd SNIPERCOR
+
+# Configure environment
+cp .env.production .env.production.local
+nano .env.production.local  # Set your API keys
+
+# Deploy to production
+./deploy-to-production.sh
 ```
 
-### **2. Konfiguracja Środowiska**
+### Endpoints
+
+- **API**: http://localhost:8003
+- **Health**: http://localhost:8003/health
+- **Metrics**: http://localhost:8003/metrics
+- **Kestra**: http://localhost:8080
+
+## 📊 Resource Allocation
+
+| Service | CPU | RAM | Priority |
+|---------|-----|-----|----------|
+| sniper-core | 4 cores | 12GB | 🔴 Critical |
+| dragonfly | Shared | 8GB | 🟡 High |
+| postgres | 1 core | 2GB | 🟢 Low |
+| kestra | 1 core | 2GB | 🟢 Low |
+
+## 📈 Monitoring
+
 ```bash
-# Skopiuj przykładową konfigurację
-cp sniper-core/.env.example sniper-core/.env
+# System status
+./monitor-system.sh
 
-# Edytuj konfigurację (dodaj swoje klucze API)
-nano sniper-core/.env
+# View logs
+docker-compose -f docker-compose.production.yml logs -f sniper-core
 ```
 
-### **3. Uruchomienie z Docker Compose**
-```bash
-# Uruchomienie wszystkich serwisów
-docker-compose up -d
+## 🔒 Security
 
-# Sprawdzenie statusu
-docker-compose ps
+- **Paper trading** by default
+- Externalized secrets via environment
+- Non-root containers
+- Network isolation
 
-# Logi sniper-core
-docker-compose logs -f sniper-core
-```
+## 📚 Documentation
 
-### **4. Testowanie API**
-```bash
-# Health check
-curl http://localhost:8003/health
+- [Production Deployment Guide](PRODUCTION-DEPLOYMENT.md)
 
-# Test paper trading (domyślnie bezpieczny)
-curl -X POST http://localhost:8003/api/v1/transaction/execute \
-  -H "Content-Type: application/json" \
-  -d '{"token_address":"So11111111111111111111111111111111111111112","amount":0.1}'
-```
+## ⚠️ Important
 
-## 📁 **Struktura Projektu**
+System starts in **PAPER TRADING** mode. Change `TRADING_MODE=live` in `.env.production` only after thorough testing.
 
-```
-SniperCore/
-├── 📚 Dokumentacja/
-│   ├── AUGMENT_MEMORY_V2.1_CONTABO_OPTIMIZED.md  # Baza wiedzy
-│   ├── REMOTE_AGENT_PROMPT.md                    # Prompt dla AI
-│   ├── CONTABO_OPTIMIZATION_SUMMARY.md           # Optymalizacje
-│   └── TECHNICAL_UPDATES_SUMMARY.md              # Aktualizacje tech
-├── 🦀 sniper-core/                               # Rust microservice
-│   ├── src/                                      # Kod źródłowy
-│   ├── Cargo.toml                                # Zależności Rust
-│   ├── .env.example                              # Konfiguracja
-│   └── Dockerfile                                # Kontener
-├── 🐍 strategy-host/                             # Python service
-├── 🔧 scripts/                                   # Skrypty pomocnicze
-├── 🐳 docker-compose.yml                         # Orkiestracja
-└── 📋 README.md                                  # Ten plik
-```
+---
+
+*SolanaSniperV3 v1.0 - Production Ready*

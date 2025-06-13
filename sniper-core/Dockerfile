@@ -23,14 +23,14 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies (this layer will be cached)
-RUN cargo build --release --profile contabo
+RUN cargo build --release
 RUN rm src/main.rs
 
 # Copy source code
 COPY src ./src
 
-# Build the actual application
-RUN cargo build --release --profile contabo
+# Build the actual application with optimizations
+RUN cargo build --release
 
 # ===== RUNTIME STAGE =====
 FROM debian:bookworm-slim

@@ -1,0 +1,192 @@
+version: '3.8'
+
+# =================================================================
+# === SolanaSniperV3 - FINAL PRODUCTION DOCKER COMPOSE v1.0 ===
+# === Zoptymalizowany pod Contabo VDS (6 vCPU / 24 GB RAM) ===
+# =================================================================
+
+services:
+  # --- Rdzeń Wykonawczy (Najwyższy Priorytet) ---
+  sniper-core:
+    build: ./sniper-core
+    container_name: sniper-core-prod
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "8003:8003"  # Port zgodny z konfiguracją serwera
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'   # Przypisujemy na sztywno 4 z 6 rdzeni
+          memory: 12G   # Przypisujemy 12GB RAM
+        reservations:
+          cpus: '3.5'   # Gwarantujemy co najmniej 3.5 rdzenia
+          memory: 8G    # Gwarantujemy co najmniej 8GB RAM
+    environment:
+      - RUST_LOG=info
+      - TOKIO_WORKER_THREADS=5  # Zgodne z konfiguracją w main.rs
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8003
+      - TRADING_MODE=paper  # Bezpieczny start w trybie paper
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      dragonfly:
+        condition: service_healthy
+    networks:
+      - sniper-network
+
+  # --- Ultra-szybki Cache (Wysoki Priorytet Pamięci) ---
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    container_name: dragonfly-prod
+    restart: unless-stopped
+    command: [
+      "dragonfly",
+      "--maxmemory=8gb",
+      "--threads=6",
+      "--bind=0.0.0.0",
+      "--port=6379",
+      "--save_schedule=*/10 * * * *",  # Backup co 10 minut
+      "--dbfilename=dump.rdb"
+    ]
+    ulimits:
+      memlock: -1
+    deploy:
+      resources:
+        limits:
+          memory: 9G    # Twardy limit na 9GB, aby nie przekroczył
+        reservations:
+          memory: 8G    # Gwarantujemy 8GB
+    volumes:
+      - dragonfly_data:/data
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - sniper-network
+
+  # --- Baza Danych (Niski Priorytet Zasobów) ---
+  postgres:
+    image: postgres:14-alpine
+    container_name: postgres-prod
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-sniper_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sniper_secure_pass_2024}
+      - POSTGRES_DB=${POSTGRES_DB:-sniper_db}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sniper_user} -d ${POSTGRES_DB:-sniper_db}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sniper-network
+
+  # --- Orkiestrator (Niski Priorytet Zasobów) ---
+  kestra:
+    image: kestra/kestra:latest-full
+    container_name: kestra-prod
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./kestra_flows:/app/flows
+      - kestra_data:/app/storage
+    environment:
+      - KESTRA_CONFIGURATION_PATH=/app/confs/application.yml
+      - KESTRA_STORAGE_TYPE=local
+      - KESTRA_STORAGE_LOCAL_BASE-PATH=/app/storage
+      - KESTRA_DATASOURCES_POSTGRES_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sniper_db}
+      - KESTRA_DATASOURCES_POSTGRES_USERNAME=${POSTGRES_USER:-sniper_user}
+      - KESTRA_DATASOURCES_POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sniper_secure_pass_2024}
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sniper-network
+
+  # --- Monitoring & Metrics (Opcjonalny - Minimal Resources) ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-prod
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
+    expose:
+      - "9090"
+    networks:
+      - sniper-network
+
+# --- Volumes dla Persistent Data ---
+volumes:
+  postgres_prod_data:
+    driver: local
+  dragonfly_data:
+    driver: local
+  kestra_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+# --- Dedicated Network dla Izolacji ---
+networks:
+  sniper-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
