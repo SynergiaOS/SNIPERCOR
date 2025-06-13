@@ -1,0 +1,112 @@
+[package]
+name = "sniper-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["SolanaSniperV3 Team"]
+description = "High-performance Solana transaction execution core"
+
+# Optymalizacje dla Contabo VDS (6 CPU / 24GB RAM)
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[dependencies]
+# HTTP Server Framework (Axum)
+axum = { version = "0.7", features = ["macros", "tracing"] }
+tokio = { version = "1.0", features = [
+    "full",
+    "rt-multi-thread",  # Kluczowe dla wykorzystania 4 rdzeni
+    "macros",
+    "signal"
+] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Serialization & JSON
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Solana Integration
+solana-sdk = "2.0"
+solana-client = "2.0"
+helius = "0.1.5"  # Smart transactions dla HFT
+
+# Error Handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging (Structured JSON dla produkcji)
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "json",
+    "env-filter",
+    "registry"
+] }
+tracing-appender = "0.2"
+
+# Configuration Management
+config = "0.14"
+dotenvy = "0.15"  # .env file support
+
+# Async utilities
+futures = "0.3"
+async-trait = "0.1"
+
+# HTTP Client dla komunikacji z external APIs
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Metrics & Monitoring
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Redis/DragonflyDB client
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID generation
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Memory management optimizations dla Contabo
+jemalloc-ctl = "0.5"
+
+# PyO3 dla Python extensions (opcjonalne)
+pyo3 = { version = "0.25.1", features = ["extension-module"], optional = true }
+
+[features]
+default = ["jemalloc"]
+python-extension = ["pyo3"]
+jemalloc = ["jemalloc-ctl"]
+
+# Konfiguracja dla różnych środowisk
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.test]
+opt-level = 1
+
+# Contabo VDS specific optimizations
+[profile.contabo]
+inherits = "release"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
+[[bin]]
+name = "sniper-core"
+path = "src/main.rs"
+
+# Opcjonalne: Python extension
+[[bin]]
+name = "sniper-py"
+path = "src/python_ext.rs"
+required-features = ["python-extension"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
